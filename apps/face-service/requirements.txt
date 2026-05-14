@@ -1,0 +1,19 @@
+# ── Core framework ────────────────────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.12
+pydantic-settings==2.3.4
+
+# ── AI — face detection + embedding ──────────────────────────
+# InsightFace uses RetinaFace (detector) + ArcFace (recogniser)
+# buffalo_l model: ~500 MB download on first run
+insightface==0.7.3
+
+# ONNX runtime — swap for onnxruntime-gpu if NVIDIA GPU available
+onnxruntime==1.18.1
+
+# ── Image processing ──────────────────────────────────────────
+# headless = no GUI deps (smaller image)
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+Pillow==10.4.0
