@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: face-service
+  namespace: facesearch
+  labels:
+    app: face-service
+    app.kubernetes.io/component: face-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: face-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: face-service
+    spec:
+      serviceAccountName: facesearch-face-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: face-service
+          image: facesearch/face-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: facesearch-config
+            - secretRef:
+                name: facesearch-secrets
+          env:
+            - name: FACE_SERVICE_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: facesearch-config
+                  key: FACE_SERVICE_MODEL
+            - name: FACE_SERVICE_DET_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: facesearch-config
+                  key: FACE_SERVICE_DET_SIZE
+            - name: FACE_SERVICE_CTX_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: facesearch-config
+                  key: FACE_SERVICE_CTX_ID
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 45
+            periodSeconds: 15
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: model-cache
+              mountPath: /root/.insightface
+      volumes:
+        - name: model-cache
+          emptyDir:
+            sizeLimit: 2Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - face-service
+                topologyKey: kubernetes.io/hostname
+      # Tolerate GPU nodes if available
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: facesearch-face-service
+  namespace: facesearch

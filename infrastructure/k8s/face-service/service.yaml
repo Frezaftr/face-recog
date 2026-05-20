@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: face-service
+  namespace: facesearch
+  labels:
+    app: face-service
+spec:
+  selector:
+    app: face-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+  type: ClusterIP
