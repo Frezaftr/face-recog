@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: facesearch
+  labels:
+    app: worker
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      serviceAccountName: facesearch-worker
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1002
+        fsGroup: 1002
+      containers:
+        - name: worker
+          image: facesearch/worker:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: facesearch-config
+            - secretRef:
+                name: facesearch-secrets
+          env:
+            - name: WORKER_KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: facesearch-config
+                  key: KAFKA_BROKERS
+            - name: WORKER_KAFKA_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: facesearch-config
+                  key: WORKER_KAFKA_TOPIC
+            - name: WORKER_KAFKA_GROUP_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: facesearch-config
+                  key: WORKER_KAFKA_GROUP_ID
+            - name: WORKER_FACE_SERVICE_URL
+              value: "http://face-service:8000"
+            - name: WORKER_MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: facesearch-config
+                  key: MINIO_ENDPOINT
+            - name: WORKER_CONCURRENCY
+              valueFrom:
+                configMapKeyRef:
+                  name: facesearch-config
+                  key: WORKER_CONCURRENCY
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os; open('/tmp/healthy')"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: facesearch-worker
+  namespace: facesearch
