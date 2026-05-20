@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: facesearch
+  labels:
+    app.kubernetes.io/name: facesearch
+    app.kubernetes.io/managed-by: kubectl

@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: facesearch-config
+  namespace: facesearch
+data:
+  # API Gateway
+  API_GATEWAY_PORT: "3000"
+  API_GATEWAY_CORS_ORIGINS: "https://facesearch.example.com"
+
+  # Face Service
+  FACE_SERVICE_PORT: "8000"
+  FACE_SERVICE_MODEL: "buffalo_l"
+  FACE_SERVICE_DET_SIZE: "640"
+  FACE_SERVICE_CTX_ID: "-1"
+
+  # Worker
+  WORKER_KAFKA_TOPIC: "image.uploaded"
+  WORKER_KAFKA_GROUP_ID: "worker-group"
+  WORKER_CONCURRENCY: "4"
+  WORKER_MINIO_BUCKET: "facesearch"
+
+  # Kafka
+  KAFKA_BROKERS: "kafka:9092"
+  KAFKA_TOPIC_IMAGE_UPLOADED: "image.uploaded"
+  KAFKA_TOPIC_IMAGE_PROCESSED: "image.processed"
+
+  # MinIO / S3
+  MINIO_ENDPOINT: "minio:9000"
+  MINIO_BUCKET: "facesearch"
+  MINIO_USE_SSL: "false"
+
+  # Database
+  POSTGRES_DB: "facesearch"
+  POSTGRES_PORT: "5432"
+  POSTGRES_HOST: "postgres"
+
+  # Web
+  NEXT_PUBLIC_API_URL: "https://api.facesearch.example.com"
