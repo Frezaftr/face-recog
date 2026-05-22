@@ -1,0 +1,30 @@
+# Copy to terraform.tfvars and fill in values before running terraform apply.
+# Do NOT commit terraform.tfvars to version control.
+
+aws_region  = "us-east-1"
+environment = "prod"
+
+# EKS
+eks_cluster_version    = "1.29"
+eks_node_instance_types = ["m6i.xlarge"]
+eks_node_desired_size  = 3
+eks_node_min_size      = 2
+eks_node_max_size      = 10
+eks_gpu_instance_types = ["g4dn.xlarge"]
+eks_gpu_desired_size   = 1
+
+# RDS
+rds_instance_class         = "db.r6g.large"
+rds_allocated_storage      = 100
+rds_max_allocated_storage  = 500
+rds_multi_az               = true
+rds_backup_retention_days  = 7
+
+# MSK
+msk_kafka_version          = "3.5.1"
+msk_instance_type          = "kafka.m5.large"
+msk_number_of_broker_nodes = 3
+msk_ebs_volume_size        = 100
+
+# S3
+s3_force_destroy = false
