@@ -10,14 +10,80 @@ Your goal is to generate a COMPLETE, SCALABLE, and CLEAN architecture + reposito
 
 | # | Phase | Files Created | Status |
 |---|-------|---------------|--------|
-| **1** | Root & Infrastructure config | `docker-compose.yml`, `.env.example`, `package.json`, `infrastructure/docker/nginx.conf`, `infrastructure/docker/postgres/init.sql` | ⬜ Not started |
-| **2** | API Gateway (NestJS) | Full NestJS app — `src/main.ts`, auth module, images module, search module, entities, kafka service, storage service, guards, DTOs, `Dockerfile` | ⬜ Not started |
-| **3** | Face Service (FastAPI / AI) | Python FastAPI — InsightFace detection + ArcFace 512-dim embedding, pgvector writes, `Dockerfile`, `requirements.txt` | ⬜ Not started |
-| **4** | Worker (Kafka consumer) | Python async worker — consumes `image.uploaded` topic, calls face service, stores embeddings, `Dockerfile` | ⬜ Not started |
-| **5** | Web Frontend (Next.js) | Next.js 14 App Router — upload page, search page, `ImageUploader`, `SearchResults`, API client, `Dockerfile` | ⬜ Not started |
-| **6** | Shared packages | `packages/shared-types` (TypeScript types), `packages/config` (env helpers) | ⬜ Not started |
-| **7** | Infrastructure — K8s + Terraform | Kubernetes manifests (deployments, services, ingress, configmaps), Terraform IaC for cloud | ⬜ Not started |
+| **1** | Root & Infrastructure config | `docker-compose.yml`, `.env.example`, `package.json`, `infrastructure/docker/nginx.conf`, `infrastructure/docker/postgres/init.sql` | ✅ Done |
+| **2** | API Gateway (NestJS) | Full NestJS app — `src/main.ts`, auth module, images module, search module, entities, kafka service, storage service, guards, DTOs, `Dockerfile` | ✅ Done |
+| **3** | Face Service (FastAPI / AI) | Python FastAPI — InsightFace detection + ArcFace 512-dim embedding, pgvector writes, `Dockerfile`, `requirements.txt` | ✅ Done |
+| **4** | Worker (Kafka consumer) | Python async worker — consumes `image.uploaded` topic, calls face service, stores embeddings, `Dockerfile` | ✅ Done |
+| **5** | Web Frontend (Next.js) | Next.js 14 App Router — upload page, search page, `ImageUploader`, `SearchResults`, API client, `Dockerfile` | ✅ Done |
+| **6** | Shared packages | `packages/shared-types` (TypeScript types), `packages/config` (env helpers) | ✅ Done |
+| **7** | Infrastructure — K8s + Terraform | Kubernetes manifests (deployments, services, ingress, configmaps), Terraform IaC for cloud | ✅ Done |
 | **8** | Scripts & seeds | `scripts/seed.py` — demo data, `scripts/test-upload.sh` — smoke test | ⬜ Not started |
+
+---
+
+## 📋 PHASE 4 — Worker (Kafka Consumer)
+
+### Overview
+Async background worker that bridges Kafka ↔ Face Service ↔ PostgreSQL.
+Consumes `image.uploaded` events, calls the face service, and persists results.
+
+### Location
+`apps/worker/`
+
+### Files to Create
+
+| File | Purpose |
+|------|---------|
+| `requirements.txt` | aiokafka, asyncpg, httpx, pydantic-settings, tenacity |
+| `Dockerfile` | python:3.11-slim, non-root user |
+| `main.py` | Entry point — starts Kafka consumer loop |
+| `app/core/config.py` | Pydantic settings (Kafka, DB, face-service URL) |
+| `app/consumer.py` | `AIOKafkaConsumer` — topic `image.uploaded`, group `worker-group` |
+| `app/handlers/image_handler.py` | Main handler: download from MinIO → POST /process → save faces+embeddings |
+| `app/db/database.py` | asyncpg pool, `get_pool()` |
+| `app/db/queries.py` | `update_image_status()`, `insert_face()`, `insert_embedding()` |
+| `app/services/storage_client.py` | MinIO `get_object()` helper |
+| `app/services/face_client.py` | httpx POST to face-service `/process` with retry (tenacity) |
+
+### Data Flow
+
+```
+Kafka topic: image.uploaded
+  ↓ (event: { imageId, storageKey, tenantId, userId })
+Worker consumer
+  ↓
+MinIO: GET object by storageKey → raw image bytes
+  ↓
+Face Service: POST /process → [{ bbox, landmarks, embedding }]
+  ↓
+PostgreSQL:
+  - INSERT INTO faces (imageId, tenantId, bbox, landmarks)
+  - INSERT INTO face_embeddings (faceId, embedding::vector(512))
+  - UPDATE images SET status='done', face_count=N WHERE id=imageId
+  (on error → UPDATE images SET status='failed', error_message=...)
+```
+
+### Key Design Decisions
+- **aiokafka** — async Kafka client, no blocking the event loop
+- **asyncpg** — async PostgreSQL, connection pool (min=2, max=10)
+- **httpx AsyncClient** — async HTTP calls to face-service
+- **tenacity** — retry face-service calls (3 retries, exponential backoff) before marking image as `failed`
+- **At-least-once delivery** — commit offset only after DB write succeeds
+- **Graceful shutdown** — SIGTERM → finish current message → stop consumer
+
+### Environment Variables Needed (add to `.env.example`)
+```
+WORKER_KAFKA_BROKERS=kafka:9092
+WORKER_KAFKA_GROUP_ID=worker-group
+WORKER_KAFKA_TOPIC=image.uploaded
+WORKER_FACE_SERVICE_URL=http://face-service:8000
+WORKER_DATABASE_URL=postgresql://user:pass@postgres:5432/facesearch
+WORKER_MINIO_ENDPOINT=minio:9000
+WORKER_MINIO_ACCESS_KEY=...
+WORKER_MINIO_SECRET_KEY=...
+WORKER_MINIO_BUCKET=facesearch
+WORKER_CONCURRENCY=4
+```
 
 ---
 
